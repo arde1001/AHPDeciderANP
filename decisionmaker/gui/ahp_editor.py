@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from ..core.ahp import GOAL_ID, AHPModel
 from .comparisons_page import ComparisonsPage
+from .scoring_page import ScoringPage
 from .sensitivity_page import SensitivityPage
 from .widgets import ConsistencyTable, RankingPanel, button_bar, heading, note, show_warnings, warnings_label
 
@@ -99,7 +100,8 @@ class AHPModelPage(QWidget):
         lay.addLayout(goal_row)
         lay.addWidget(split, 1)
         lay.addWidget(note(
-            "Next: open <b>Comparisons</b> and judge each pair on the 1–9 scale. Names can be edited in place "
+            "Next: choose in <b>Scoring</b> how alternatives are scored under each criterion (pairwise by default), "
+            "then judge the pairs in <b>Comparisons</b>. Names can be edited in place "
             "(double-click or F2); judgments are kept when you rename, reorder or add items."
         ))
         self.refresh()
@@ -304,7 +306,7 @@ class AHPResultsPage(QWidget):
 
         self.ranking = RankingPanel()
         self.weights = QTreeWidget()
-        self.weights.setHeaderLabels(["Criterion", "Local weight", "Global weight"])
+        self.weights.setHeaderLabels(["Criterion", "Local weight", "Global weight", "Alternatives scored by"])
         self.weights.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.consistency = ConsistencyTable()
         self.consistency.jump.connect(self.jump)
@@ -356,7 +358,8 @@ class AHPResultsPage(QWidget):
             else:
                 item = QTreeWidgetItem(
                     items[parent.id],
-                    [node.name, f"{result.local_weights[node.id]:.4f}", f"{result.global_weights[node.id]:.4f}"],
+                    [node.name, f"{result.local_weights[node.id]:.4f}", f"{result.global_weights[node.id]:.4f}",
+                     "" if node.children else self.model.scoring_mode(node)],
                 )
             for c in (1, 2):
                 item.setTextAlignment(c, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -380,22 +383,26 @@ class AHPEditor(QTabWidget):
         super().__init__(parent)
         self.model = model
         self.model_page = AHPModelPage(model)
+        self.scoring = ScoringPage(model)
         self.comparisons = ComparisonsPage(model)
         self.results = AHPResultsPage(model)
         self.sensitivity = SensitivityPage(model)
         self.addTab(self.model_page, "1 · Model")
-        self.addTab(self.comparisons, "2 · Comparisons")
-        self.addTab(self.results, "3 · Results")
-        self.addTab(self.sensitivity, "4 · Sensitivity")
-        for page in (self.model_page, self.comparisons, self.results):
+        self.addTab(self.scoring, "2 · Scoring")
+        self.addTab(self.comparisons, "3 · Comparisons")
+        self.addTab(self.results, "4 · Results")
+        self.addTab(self.sensitivity, "5 · Sensitivity")
+        for page in (self.model_page, self.scoring, self.comparisons, self.results):
             page.changed.connect(self.modified)
         self.comparisons.message.connect(self.message)
+        self.scoring.message.connect(self.message)
+        self.scoring.jump.connect(self.jump_to)
         self.results.jump.connect(self.jump_to)
         self.currentChanged.connect(self._tab_changed)
 
     def set_model(self, model: AHPModel) -> None:
         self.model = model
-        for page in (self.model_page, self.comparisons, self.results, self.sensitivity):
+        for page in (self.model_page, self.scoring, self.comparisons, self.results, self.sensitivity):
             page.model = model
         self.model_page.refresh()
         self._tab_changed(self.currentIndex())

@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__
-from ..core import project
+from .. import __copyright__, __version__
+from ..core import exchange, project
 from ..core.ahp import AHPModel
 from ..core.anp import ANPModel
 from .ahp_editor import AHPEditor
@@ -42,6 +42,9 @@ clusters and nodes with arbitrary influence, including feedback (alternatives in
 criteria) and inner dependence (criteria influence each other).</li>
 <li><b>Build the model</b> in the first tab(s). For ANP, define in <i>Connections</i> which nodes are
 compared with respect to which.</li>
+<li><b>AHP: choose how alternatives are scored</b> under each lowest-level criterion (<i>Scoring</i> tab):
+pairwise comparison, direct measured values (ratio scale: zero means none; benefit = value / sum, cost =
+(1/value) / sum), or ratings (compare levels such as Excellent…Poor once, then rate each alternative).</li>
 <li><b>Make the pairwise comparisons.</b> For each pair, pick how strongly one item dominates the other.</li>
 <li><b>Check consistency.</b> Aim for a consistency ratio CR ≤ 0.10. When a matrix is inconsistent the editor
 highlights the judgment that disagrees most with the others and suggests a value.</li>
@@ -109,6 +112,9 @@ class WelcomePage(QWidget):
         host.setMaximumWidth(720)
         box.addWidget(host, 0, Qt.AlignmentFlag.AlignHCenter)
         box.addStretch(2)
+        footer = note(__copyright__)
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        box.addWidget(footer)
 
 
 class MainWindow(QMainWindow):
@@ -153,7 +159,13 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         self.save_action = self._action(m, "&Save", self.save, QKeySequence.StandardKey.Save)
         self.save_as_action = self._action(m, "Save &as…", self.save_as, QKeySequence.StandardKey.SaveAs)
-        self.export_action = self._action(m, "&Export results as CSV…", self.export_csv, "Ctrl+E")
+        export = m.addMenu("&Export")
+        self.export_actions = [
+            self._action(export, "Model and matrices as &Excel workbook (.xlsx)…", self.export_xlsx, "Ctrl+E"),
+            self._action(export, "Model and matrices as CSV files (&zip)…", self.export_csv_zip),
+            self._action(export, "Results &summary (single CSV)…", self.export_csv),
+        ]
+        self.export_menu = export
         m.addSeparator()
         self._action(m, "&Close project", self.close_project, QKeySequence.StandardKey.Close)
         self._action(m, "&Quit", self.close, QKeySequence.StandardKey.Quit)
@@ -163,8 +175,9 @@ class MainWindow(QMainWindow):
         self._enable_project_actions(False)
 
     def _enable_project_actions(self, on: bool) -> None:
-        for a in (self.save_action, self.save_as_action, self.export_action):
+        for a in (self.save_action, self.save_as_action, *self.export_actions):
             a.setEnabled(on)
+        self.export_menu.setEnabled(on)
 
     def _fill_recent(self) -> None:
         self.recent_menu.clear()
@@ -291,21 +304,28 @@ class MainWindow(QMainWindow):
         self._update_title()
         return self.save()
 
-    def export_csv(self) -> None:
+    def _export(self, title: str, suffix: str, file_filter: str, writer) -> None:
         if self.model is None:
             return
         base = self.path.with_suffix("") if self.path else Path.home() / (_slug(self.model.goal) or "decision")
-        file, _ = QFileDialog.getSaveFileName(
-            self, "Export results", f"{base}-results.csv", "CSV files (*.csv);;All files (*)"
-        )
+        file, _ = QFileDialog.getSaveFileName(self, title, f"{base}{suffix}", f"{file_filter};;All files (*)")
         if not file:
             return
         try:
-            project.export_csv(self.model, file)
+            writer(self.model, file)
         except OSError as e:
-            QMessageBox.critical(self, "Export results", f"Could not write {file}:\n{e}")
+            QMessageBox.critical(self, title, f"Could not write {file}:\n{e}")
             return
-        self.statusBar().showMessage(f"Exported results to {file}", 5000)
+        self.statusBar().showMessage(f"Exported to {file}", 5000)
+
+    def export_csv(self) -> None:
+        self._export("Export results summary", "-results.csv", "CSV files (*.csv)", project.export_csv)
+
+    def export_xlsx(self) -> None:
+        self._export("Export model and matrices", "-model.xlsx", "Excel workbooks (*.xlsx)", exchange.export_xlsx)
+
+    def export_csv_zip(self) -> None:
+        self._export("Export model and matrices", "-model.zip", "Zip of CSV files (*.zip)", exchange.export_csv_zip)
 
     # ---- help ----------------------------------------------------------
 
@@ -324,7 +344,7 @@ class MainWindow(QMainWindow):
             self, "About",
             f"<b>AHP / ANP Decision Maker</b> {__version__}<br>"
             "Analytic Hierarchy Process and Analytic Network Process (T. L. Saaty) "
-            "with pairwise comparisons on the 1–9 scale.",
+            f"with pairwise comparisons on the 1–9 scale.<br><br>{__copyright__}",
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:

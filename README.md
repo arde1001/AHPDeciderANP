@@ -36,15 +36,26 @@ of two bundled examples (*File → Open example*).
 
 1. **Model**: set the goal and build the criteria tree (criteria can nest to any
    depth) and the list of alternatives. Double-click or press F2 to rename.
-2. **Comparisons**: one entry per node that has at least two things below it.
+2. **Scoring**: for each lowest-level criterion, choose how the alternatives
+   are scored:
+   - *Pairwise comparison* (the default, classic AHP).
+   - *Direct values*: measured data on a ratio scale, such as hours or euros.
+     Priorities are value / sum for benefit criteria (higher is better) and
+     (1/value) / Σ(1/value) for cost criteria (lower is better).
+   - *Ratings*: compare rating levels such as Excellent…Poor once, then give
+     each alternative a level. Each level's weight is idealized (best = 1).
+   Missing data is flagged, and that criterion counts its alternatives as equal
+   until it's filled in.
+3. **Comparisons**: one entry per node that has at least two things below it,
+   plus the rating-level scales.
    For each pair, click the classic `9 … 2 1 2 … 9` row, or type `3` or `1/5`
    into the matrix. The priorities and CR update live. When CR > 0.10, the
    most inconsistent judgments are highlighted, each with a suggested value and
    an **Apply** button.
-3. **Results**: ranking table and bar chart, local and global criteria weights,
+4. **Results**: ranking table and bar chart, local and global criteria weights,
    and the consistency of every matrix (double-click a row to open that
    matrix). Switch between *distributive* and *ideal* synthesis.
-4. **Sensitivity**: pick any comparison and element, then sweep its weight from
+5. **Sensitivity**: pick any comparison and element, then sweep its weight from
    0 to 1 (its siblings keep their ratios). The chart shows every alternative's
    score. The points where the best alternative changes are marked and listed.
    Click or drag on the chart to probe a weight.
@@ -64,11 +75,39 @@ of two bundled examples (*File → Open example*).
    per cluster), consistency, and warnings.
 6. **Sensitivity**: works like AHP, for any node or cluster comparison.
 
-*File* menu: save and open projects (`.json`), *Export results as CSV*
-(ranking, weights or limit priorities, and a consistency table), and recent
+*File* menu: save and open projects (`.json`), *Export* (below), and recent
 files. *Help → Guide* explains the scale and the math.
 
+## Exporting to other AHP/ANP software
+
+The `.json` project format belongs to this app only. No other AHP/ANP program
+shares a file format, so *File → Export → Model and matrices* writes the whole
+model as plain tables. Spreadsheets, scripts and people re-entering the model
+in other tools can all read it. It comes as one Excel workbook (`Ctrl+E`) or as
+a zip of UTF-8 CSV files with the same content:
+
+| Sheet / file | Contents | Use it for |
+|---|---|---|
+| About / `README.txt` | Scale and matrix conventions, import tips | Read first |
+| Structure | Goal → criteria tree and alternatives (AHP), or clusters and nodes (ANP), with ids | Rebuilding the model |
+| Connections (ANP) | 0/1 node matrix: row *i*, column *j* = 1 when *i* is compared w.r.t. *j* (SuperDecisions: node *j* connects to *i*) | Rebuilding the network links |
+| Judgments | One row per pair: A, B, numeric a<sub>AB</sub>, `1/3` text, **Preferred** item + **Intensity 1–9**, verbal label, judged yes/no | Verbal or questionnaire entry (Expert Choice / Comparion, SpiceLogic…) |
+| Comparisons | Index of all matrices with λmax, CI, RI, CR, and links to the sheets | Overview and cross-checking CR |
+| `M01 …`, `M02 …` | Full reciprocal matrix per comparison, labels in the first row and column, priorities in the last column. Excel shows them as fractions but stores them as numbers | Matrix or numerical entry, R/Python (`pandas.read_csv(f, index_col=0)`) |
+| Scores (AHP) | Direct values and ratings per alternative for criteria not scored pairwise | Data or ratings entry in the other tool |
+| Results | Ranking (AHP: distributive **and** ideal), weights or limit priorities | Comparing with the other tool's output |
+| Unweighted, cluster, weighted, limit supermatrix (ANP) | The four matrices | Cross-checking SuperDecisions |
+
+These files are meant for reading and re-entry. They can't be imported straight
+into those programs' own project files, because their formats are proprietary
+or undocumented. A test re-enters a model from the Judgments table alone and
+checks that it gives identical results. *Results summary (single CSV)* is the
+short report from earlier versions.
+
 ## Method details
+
+Project files carry a format version. Version-1 files from earlier releases
+load unchanged (every criterion is scored pairwise). Saving writes version 2.
 
 - **Priorities**: the normalized principal right eigenvector of the reciprocal
   matrix. Pairs that haven't been judged count as 1 (equal) and are flagged as
@@ -99,7 +138,8 @@ decisionmaker/
     ahp.py         # AHPModel: criteria tree, synthesis, JSON
     anp.py         # ANPModel: clusters, links, supermatrices, limit matrix
     sensitivity.py # one-at-a-time weight sweep and rank-reversal points
-    project.py     # save/load JSON, CSV export
+    project.py     # save/load JSON, results summary CSV
+    exchange.py    # interchange export: Excel workbook / CSV zip
   gui/             # PySide6 widgets (main window, editors, charts)
   examples/        # laptop_ahp.json, car_anp.json
 tests/             # core math + offscreen GUI smoke tests
@@ -113,3 +153,7 @@ adding items keeps every judgment that still applies.
 ```sh
 .venv/bin/pytest            # the GUI tests run with QT_QPA_PLATFORM=offscreen
 ```
+
+## License
+
+Copyright © 2026 arde1001. All rights reserved. See [LICENSE](LICENSE).

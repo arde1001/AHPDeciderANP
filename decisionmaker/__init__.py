@@ -1,3 +1,7 @@
-"""AHP / ANP decision making."""
+"""AHP / ANP decision making.
 
-__version__ = "1.0.0"
+Copyright © 2026 arde1001. All rights reserved.
+"""
+
+__version__ = "1.2.0"
+__copyright__ = "Copyright © 2026 arde1001. All rights reserved."

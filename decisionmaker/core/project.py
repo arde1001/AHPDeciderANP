@@ -11,7 +11,7 @@ from .ahp import GOAL_ID, AHPModel
 from .anp import ANPModel
 
 FORMAT = "ahp-anp-decisionmaker"
-VERSION = 1
+VERSION = 2  # 2: AHP leaf scoring methods (direct values, ratings); version 1 files load unchanged
 
 Model = AHPModel | ANPModel
 
@@ -23,6 +23,9 @@ def model_to_dict(model: Model) -> dict:
 def model_from_dict(data: dict) -> Model:
     if data.get("format") not in (None, FORMAT):
         raise ValueError("not an AHP/ANP decision maker project")
+    version = data.get("version", 1)
+    if not isinstance(version, int) or version > VERSION:
+        raise ValueError(f"project format version {version} is newer than this program supports ({VERSION}); update the program")
     kind = data.get("type")
     if kind == "ahp":
         return AHPModel.from_dict(data)
@@ -69,13 +72,14 @@ def export_csv(model: Model, path: str | Path) -> None:
 
     if isinstance(model, AHPModel):
         rows[1].append(f"synthesis: {model.synthesis}")
-        rows += [[], ["Criteria"], ["Criterion path", "Level", "Local weight", "Global weight"]]
+        rows += [[], ["Criteria"], ["Criterion path", "Level", "Local weight", "Global weight", "Alternatives scored by"]]
         for node, _, depth in model.walk():
             if node.id == GOAL_ID:
                 continue
             rows.append([
                 " > ".join(model.path(node.id)), str(depth),
                 _fmt(result.local_weights[node.id]), _fmt(result.global_weights[node.id]),
+                "" if node.children else model.scoring_mode(node),
             ])
     else:
         rows += [[], ["Limit priorities"], ["Cluster", "Node", "Limit priority", "Normalized by cluster"]]

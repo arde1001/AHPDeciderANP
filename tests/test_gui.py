@@ -227,3 +227,76 @@ def test_close_and_reopen(window, tmp_path):
     assert window.open_path(path)
     assert window.model.goal == "Choose a new laptop"
     assert not window.open_path(tmp_path / "missing.json")
+
+
+def test_export_menu_actions(window, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    targets = iter([tmp_path / "m.xlsx", tmp_path / "m.zip", tmp_path / "r.csv"])
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(next(targets)), ""))
+    assert not window.export_menu.isEnabled()  # no project yet
+    window.open_example("car_anp.json")
+    assert window.export_menu.isEnabled()
+    for action in window.export_actions:
+        action.trigger()
+    assert (tmp_path / "m.xlsx").stat().st_size > 0
+    assert (tmp_path / "m.zip").stat().st_size > 0
+    assert (tmp_path / "r.csv").stat().st_size > 0
+
+
+def test_scoring_tab_direct_values_and_ratings(window, tmp_path):
+    from decisionmaker.core.ahp import levels_key
+
+    window.open_example("laptop_ahp.json")
+    editor = window.editor
+    model = window.model
+    editor.setCurrentWidget(editor.scoring)
+    sp = editor.scoring
+    leaves = model.leaves()
+    assert sp.leaves.count() == len(leaves)
+
+    # Price: direct values, lower is better
+    price = next(x for x in leaves if x.name == "Price")
+    sp.leaves.setCurrentRow(leaves.index(price))
+    sp.mode.setCurrentIndex(sp.mode.findData("direct"))
+    assert model.scoring_mode(price) == "direct"
+    assert sp.problem.isVisibleTo(sp)  # no values yet
+    sp.direction.setCurrentIndex(sp.direction.findData("cost"))
+    for row, text in enumerate(["1200", "1800,5", "600"]):
+        sp.values.item(row, 1).setText(text)
+        QApplication.processEvents()
+    values = model.scoring(price.id).values
+    assert [values[a.id] for a in model.alternatives] == [1200, 1800.5, 600]
+    assert model.scoring_problem(price) is None
+    sp.values.item(0, 1).setText("abc")  # rejected, keeps the old value
+    QApplication.processEvents()
+    assert model.scoring(price.id).values[model.alternatives[0].id] == 1200
+
+    # Battery life: ratings
+    battery = next(x for x in leaves if x.name == "Battery life")
+    sp.leaves.setCurrentRow(leaves.index(battery))
+    sp.mode.setCurrentIndex(sp.mode.findData("ratings"))
+    assert sp.levels.count() == 5
+    for row in range(3):
+        sp.ratings.cellWidget(row, 1).setCurrentIndex(row + 1)
+    assert len(model.scoring(battery.id).ratings) == 3
+    assert model.scoring_problem(battery) is None
+    sp._add_level()
+    QApplication.processEvents()
+    assert len(model.scoring(battery.id).levels) == 6
+    sp.levels.setCurrentRow(5)
+    sp._remove_level()
+
+    # the levels comparison is reachable and the price comparison is gone from the list
+    keys = {s.key for s in model.comparison_sets()}
+    assert levels_key(battery.id) in keys and price.id not in keys
+    sp.jump.emit(levels_key(battery.id))
+    assert editor.currentWidget() is editor.comparisons
+    visit_all_tabs(editor)
+
+    path = tmp_path / "scored.json"
+    window.path = path
+    assert window.save()
+    again = project.load(path)
+    assert again.scoring_mode(again.find(price.id)) == "direct"
+    assert again.evaluate().alternative_scores == pytest.approx(model.evaluate().alternative_scores)
