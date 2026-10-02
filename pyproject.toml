@@ -7,7 +7,7 @@ name = "decisionmaker"
 version = "1.2.0"
 description = "AHP and ANP multi-criteria decision making with a Qt GUI"
 readme = "README.md"
-license = "LicenseRef-Proprietary"
+license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "arde1001" }]
 requires-python = ">=3.10"

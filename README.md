@@ -8,24 +8,58 @@ a ranking and a sensitivity analysis.
 
 ## Install and run
 
+You need **Python 3.10 or newer** (`python3 --version`) and **git**. All other
+dependencies (PySide6/Qt, numpy, matplotlib, openpyxl) come from PyPI into a
+virtual environment, so you don't need system Qt packages or admin rights.
+
+**Linux / macOS**
+
 ```sh
-cd ~/Projects/ahp_anp_decisionmaker
-python -m venv .venv
+git clone https://github.com/arde1001/AHPDeciderANP.git
+cd AHPDeciderANP
+python3 -m venv .venv
 .venv/bin/pip install -e '.[test]'
-.venv/bin/decisionmaker                 # or: .venv/bin/python -m decisionmaker
-.venv/bin/decisionmaker project.json    # open a saved project directly
+.venv/bin/decisionmaker                  # start the app
+.venv/bin/decisionmaker project.json     # or open a saved project directly
 ```
 
-Requires Python ≥ 3.10, PySide6, numpy and matplotlib. They're installed from
-PyPI, so no system Qt/Tk packages are needed.
+**Windows** (PowerShell or cmd)
 
-To add it to the application menu / launcher (creates the venv first if it
-doesn't exist):
+```bat
+git clone https://github.com/arde1001/AHPDeciderANP.git
+cd AHPDeciderANP
+py -m venv .venv
+.venv\Scripts\pip install -e ".[test]"
+.venv\Scripts\decisionmaker
+```
+
+`python -m decisionmaker` also works from inside the activated environment.
+To try it quickly, click one of the two **Example** buttons on the welcome screen
+(an AHP laptop choice, an ANP car purchase), then look at the *Results* and
+*Sensitivity* tabs.
+
+**Optional, Linux:** add it to the application menu or launcher. This creates
+the virtual environment first if it doesn't exist yet:
 
 ```sh
 ./install-desktop-entry.sh            # writes ~/.local/share/applications/decisionmaker.desktop
 ./install-desktop-entry.sh --remove   # uninstall
 ```
+
+### Troubleshooting
+
+- **`qt.qpa.plugin: Could not load the Qt platform plugin "xcb"`** (Linux,
+  usually minimal X11 installs): install Qt's X11 runtime libraries.
+  - Debian/Ubuntu: `sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libegl1`
+  - Fedora: `sudo dnf install xcb-util-cursor libxkbcommon-x11`
+  - Arch: `sudo pacman -S xcb-util-cursor`
+
+  On Wayland you can also try `QT_QPA_PLATFORM=wayland .venv/bin/decisionmaker`.
+- **`pip` can't find a PySide6 version**: your Python is too old or too new for
+  the published wheels. Use a Python version from python.org that PySide6
+  supports (3.10–3.13 are safe choices).
+- **Light/dark look:** the app follows the system's light or dark theme where
+  Qt can detect it (Windows, macOS, GNOME/KDE). Elsewhere it starts light.
 
 ## Using it
 
@@ -151,9 +185,12 @@ adding items keeps every judgment that still applies.
 ## Tests
 
 ```sh
-.venv/bin/pytest            # the GUI tests run with QT_QPA_PLATFORM=offscreen
+.venv/bin/pytest            # Windows: .venv\Scripts\pytest
 ```
+
+The GUI tests run headless (`QT_QPA_PLATFORM=offscreen`), so they need no
+display and don't open any windows.
 
 ## License
 
-Copyright © 2026 arde1001. All rights reserved. See [LICENSE](LICENSE).
+MIT License. Copyright © 2026 arde1001. See [LICENSE](LICENSE).
